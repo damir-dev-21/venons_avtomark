@@ -24,22 +24,14 @@ class _MainScreenState extends State<MainScreen> {
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   final flutterBlue = FlutterBluePlus.instance;
 
-  var final_str = "";
-  bool _onKey(KeyEvent event) {
-    final key = event.logicalKey.keyLabel;
-
-    setState(() {
-      final_str = final_str + key.characters.toString();
-    });
-    print(key.characters);
-
-    return false;
-  }
-
   @override
   void initState() {
     super.initState();
-    ServicesBinding.instance.keyboard.addHandler(_onKey);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
@@ -47,12 +39,6 @@ class _MainScreenState extends State<MainScreen> {
     final OperationsProvider operationsProvider =
         Provider.of<OperationsProvider>(context);
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          print(final_str);
-        },
-        child: Text('!'),
-      ),
       body: SafeArea(
           child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
@@ -99,49 +85,43 @@ class _MainScreenState extends State<MainScreen> {
                   height: MediaQuery.of(context).size.height - 135,
                   child: Column(
                     children: [
-                      // Expanded(
-                      //     child: ListView.builder(
-                      //         itemCount: operationsProvider.operations.length,
-                      //         itemBuilder: (context, index) {
-                      //           final Operation operation =
-                      //               operationsProvider.operations[index];
-                      //           final documentStatus = operation.status == 0
-                      //               ? 'Продажа'
-                      //               : 'Перемещение';
-                      //           final documentDate = operation.date;
-                      //           final documentNumber = operation.number;
-                      //           return ListTile(
-                      //             onTap: () {
-                      //               print(operation.warehouse);
-                      //               print(operation.client);
-                      //               context.router.push(
-                      //                   OperationRoute(operation: operation));
-                      //             },
-                      //             shape: OutlineInputBorder(
-                      //                 borderSide:
-                      //                     BorderSide(color: logoTextColor)),
-                      //             style: ListTileStyle.drawer,
-                      //             title: Text(
-                      //                 '$documentStatus №$documentNumber от $documentDate'),
-                      //             trailing: operation.success
-                      //                 ? Icon(
-                      //                     Icons.done,
-                      //                     color: saveBtnColor,
-                      //                     size: 20,
-                      //                   )
-                      //                 : Icon(
-                      //                     Icons.close_sharp,
-                      //                     color: saleBtnColor,
-                      //                     size: 20,
-                      //                   ),
-                      //           );
-                      //         })),
-                      // Expanded(child: _buildListDevices()),
-                      // ElevatedButton(
-                      //   onPressed: () => scanDevices(),
-                      //   child: Text('Scan Devices'),
-                      // ),
-                      TextField()
+                      Expanded(
+                          child: ListView.builder(
+                              itemCount: operationsProvider.operations.length,
+                              itemBuilder: (context, index) {
+                                final Operation operation =
+                                    operationsProvider.operations[index];
+                                final documentStatus = operation.status == 0
+                                    ? 'Продажа'
+                                    : 'Перемещение';
+                                final documentDate = operation.date;
+                                final documentNumber = operation.number;
+                                return ListTile(
+                                  onTap: () {
+                                    print(operation.warehouse);
+                                    print(operation.client);
+                                    context.router.push(
+                                        OperationRoute(operation: operation));
+                                  },
+                                  shape: OutlineInputBorder(
+                                      borderSide:
+                                          BorderSide(color: logoTextColor)),
+                                  style: ListTileStyle.drawer,
+                                  title: Text(
+                                      '$documentStatus №$documentNumber от $documentDate'),
+                                  trailing: operation.success
+                                      ? Icon(
+                                          Icons.done,
+                                          color: saveBtnColor,
+                                          size: 20,
+                                        )
+                                      : Icon(
+                                          Icons.close_sharp,
+                                          color: saleBtnColor,
+                                          size: 20,
+                                        ),
+                                );
+                              })),
                     ],
                   ),
                 ),

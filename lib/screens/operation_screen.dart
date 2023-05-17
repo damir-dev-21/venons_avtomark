@@ -1,5 +1,8 @@
 import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_barcode_listener/flutter_barcode_listener.dart';
+import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
@@ -18,6 +21,10 @@ class OperationScreen extends StatefulWidget {
 
 class _OperationScreenState extends State<OperationScreen> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  TextEditingController _controller = TextEditingController();
+  final KeyboardVisibilityController _keyboardVisibilityController =
+      KeyboardVisibilityController();
+  FocusNode _textFocusNode = FocusNode();
   Barcode? result;
   QRViewController? controller;
   String comment = '';
@@ -28,10 +35,14 @@ class _OperationScreenState extends State<OperationScreen> {
   List<DataRow> rows = [];
   String _scanText = '';
   bool _isAdd = false;
+  String _finalScanStr = "";
+  late var formKey;
 
   @override
   void initState() {
     super.initState();
+    formKey = GlobalKey<FormState>();
+    ServicesBinding.instance.keyboard.addHandler(_onKey);
 
     warehouse = widget.operation.warehouse;
     client = widget.operation.client;
@@ -47,8 +58,39 @@ class _OperationScreenState extends State<OperationScreen> {
               ],
             ))
         .toList();
+  }
 
-    _focusNode.requestFocus();
+  bool _onKey(KeyEvent event) {
+    final key = event.logicalKey.keyLabel;
+
+    if (event is KeyDownEvent) {
+      if (key.characters.toString() != 'Enter') {
+        setState(() {
+          _finalScanStr = _finalScanStr + key.characters.toString();
+        });
+        print(key.characters);
+      } else {
+        Map<String, dynamic> _item = {
+          'name': _finalScanStr,
+          'announce': 0,
+          'scanned': 0
+        };
+        _addToTable(_item);
+      }
+    }
+
+    return false;
+  }
+
+  _addToTable(Map<String, dynamic> item) {
+    setState(() {
+      _isAdd = true;
+      items.add(Item(items.length + 1, "", item['name'], item['announce'],
+          item['scanned']));
+      _updateRows(Item(items.length + 1, "", item['name'], item['announce'],
+          item['scanned']));
+      _finalScanStr = '';
+    });
   }
 
   _showScanner() {
@@ -77,7 +119,7 @@ class _OperationScreenState extends State<OperationScreen> {
     });
   }
 
-  void _onQRViewCreated(QRViewController controller, BuildContext contexts) {
+  _onQRViewCreated(QRViewController controller, BuildContext contexts) {
     setState(() {
       this.controller = controller;
     });
@@ -105,8 +147,8 @@ class _OperationScreenState extends State<OperationScreen> {
     });
   }
 
-  void _updateRows(e) {
-    items.firstWhere((e) => e.id == items.length).name = e;
+  _updateRows(Item item) {
+    items.firstWhere((e) => e.id == items.length).name = item.name;
     rows = items
         .map((e) => DataRow(
               cells: [
@@ -122,7 +164,7 @@ class _OperationScreenState extends State<OperationScreen> {
     });
   }
 
-  void _onPermissionSet(BuildContext context, QRViewController ctrl, bool p) {
+  _onPermissionSet(BuildContext context, QRViewController ctrl, bool p) {
     if (!p) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('no Permission')),
@@ -130,7 +172,12 @@ class _OperationScreenState extends State<OperationScreen> {
     }
   }
 
-  final FocusNode _focusNode = FocusNode();
+  @override
+  void dispose() {
+    ServicesBinding.instance.keyboard.removeHandler(_onKey);
+    controller?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,10 +187,10 @@ class _OperationScreenState extends State<OperationScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-          child: RawKeyboardListener(
-        focusNode: _focusNode,
-        onKey: (RawKeyEvent event) {
-          print('Key pressed: ${event.logicalKey.keyLabel}');
+          child: BarcodeKeyboardListener(
+        bufferDuration: Duration(milliseconds: 500),
+        onBarcodeScanned: (barcode) {
+          print("barcode: " + barcode);
         },
         child: Container(
           padding: const EdgeInsets.all(10),
@@ -151,12 +198,6 @@ class _OperationScreenState extends State<OperationScreen> {
           width: MediaQuery.of(context).size.width,
           child: Column(
             children: [
-              SizedBox(
-                height: 0,
-                child: TextField(
-                  focusNode: _focusNode,
-                ),
-              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -244,6 +285,7 @@ class _OperationScreenState extends State<OperationScreen> {
                     borderRadius: BorderRadius.circular(5)),
                 width: MediaQuery.of(context).size.width - 20,
                 child: DropdownButton(
+                    focusNode: _textFocusNode,
                     isExpanded: true,
                     alignment: Alignment.centerLeft,
                     hint: const Padding(
@@ -264,6 +306,7 @@ class _OperationScreenState extends State<OperationScreen> {
                       setState(() {
                         warehouse = e!;
                       });
+                      _textFocusNode.unfocus();
                     }),
               ),
               const SizedBox(
@@ -275,13 +318,18 @@ class _OperationScreenState extends State<OperationScreen> {
                 children: [
                   SizedBox(
                     width: MediaQuery.of(context).size.width - 20,
-                    child: TextFormField(
+                    child: TextField(
+                      autofocus: false,
+                      focusNode: _textFocusNode,
                       keyboardType: TextInputType.text,
                       key: const ValueKey('comment'),
                       onChanged: (e) {
                         setState(() {
                           comment = e;
                         });
+                      },
+                      onEditingComplete: () {
+                        _textFocusNode.unfocus();
                       },
                       decoration: InputDecoration(
                           hintText: "Примечание",
@@ -324,7 +372,8 @@ class _OperationScreenState extends State<OperationScreen> {
                                             Text((items.length).toString()))),
                                     DataCell(TextField(
                                       onEditingComplete: () {
-                                        _updateRows(_scanText);
+                                        _updateRows(Item(items.length + 1, "",
+                                            _scanText, 0, 0));
                                         setState(() {
                                           _isAdd = true;
                                           items.add(Item(
@@ -337,7 +386,12 @@ class _OperationScreenState extends State<OperationScreen> {
                                                       .toString()))),
                                               DataCell(TextField(
                                                 onEditingComplete: () {
-                                                  _updateRows(_scanText);
+                                                  _updateRows(Item(
+                                                      items.length + 1,
+                                                      "",
+                                                      _scanText,
+                                                      0,
+                                                      0));
                                                 },
                                                 onChanged: (e) {
                                                   setState(() {
@@ -474,11 +528,5 @@ class _OperationScreenState extends State<OperationScreen> {
         ),
       )),
     );
-  }
-
-  @override
-  void dispose() {
-    controller?.dispose();
-    super.dispose();
   }
 }
